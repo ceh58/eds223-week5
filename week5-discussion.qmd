@@ -1,0 +1,83 @@
+---
+title: "Week 5 Discussion"
+author: "Carmen Hoyt"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# Import packages
+```{r}
+library(tidyverse)
+library(sf)
+library(terra)
+library(spData)
+library(spDataLarge)
+```
+
+# Load data
+```{r}
+# Load raster data representing grain sizes with the three classes clay, silt and sand
+grain <- terra::rast(system.file("raster/grain.tif", package = "spData"))
+
+# NZ height
+nz_height <- spData::nz_height
+```
+
+# Create a template raster:
+```{r}
+# Subset points higher than 3100
+high_points <- nz_height %>% 
+  filter(elevation > 3100)
+
+template <- rast(ext(high_points), crs = crs(high_points), resolution = 3000)
+```
+
+# Number of elevation points:
+```{r}
+nz_raster <- rasterize(high_points, template, field = "elevation", fun = "length")
+
+plot(nz_raster, main = "Number of Elevation Points > 3100 in Each Grid Cell")
+plot(st_geometry(high_points), add = TRUE)
+```
+
+# Max elevation:
+```{r}
+nz_raster2 <- rasterize(high_points, template, field = "elevation", fun = max)
+
+plot(nz_raster2, main = "Max Elevation (m) in Each Grid Cell")
+plot(st_geometry(high_points), add = TRUE)
+```
+
+# Aggregate:
+```{r}
+nz_aggregate <- aggregate(nz_raster, fact = 2, fun = sum, na.rm = TRUE)
+
+plot(nz_aggregate)
+plot(st_geometry(high_points), add = TRUE)
+
+# Resample:
+nz_resample <- resample(nz_aggregate, nz_raster)
+plot(nz_resample)
+
+plots <- c(nz_raster, nz_resample)
+labs <- c("Original 6 x 6 km", "Resample 6 x 6 km")
+plot(plots, main = labs)
+```
+
+# Polygonize `grain` and filter to only keep squares that represent clay
+```{r}
+grain_poly <- as.polygons(grain) %>%
+  st_as_sf()
+
+plot(grain, main = "Grain (Raster)")
+plot(grain_poly, main = "Grain (Vector)")
+
+# Subset polygons to clay
+clay <- grain_poly %>%
+  filter(grain == "clay")
+
+plot(clay, main = "Clay")
+```
+
